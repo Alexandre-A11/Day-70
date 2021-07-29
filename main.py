@@ -9,15 +9,23 @@ from sqlalchemy.orm import relationship
 from flask_login import UserMixin, login_user, LoginManager, login_required, current_user, logout_user
 from forms import LoginForm, RegisterForm, CreatePostForm, CommentForm
 from flask_gravatar import Gravatar
+import os
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = '8BYkEfBA6O6donzWlSihBXox7C0sKR6b'
+app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY")
 ckeditor = CKEditor(app)
 Bootstrap(app)
-gravatar = Gravatar(app, size=100, rating='g', default='retro', force_default=False, force_lower=False, use_ssl=False, base_url=None)
+gravatar = Gravatar(app,
+                    size=100,
+                    rating='g',
+                    default='retro',
+                    force_default=False,
+                    force_lower=False,
+                    use_ssl=False,
+                    base_url=None)
 
 ##CONNECT TO DB
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///blog.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 login_manager = LoginManager()
@@ -61,6 +69,8 @@ class Comment(db.Model):
     parent_post = relationship("BlogPost", back_populates="comments")
     comment_author = relationship("User", back_populates="comments")
     text = db.Column(db.Text, nullable=False)
+
+
 db.create_all()
 
 
@@ -70,13 +80,16 @@ def admin_only(f):
         if current_user.id != 1:
             return abort(403)
         return f(*args, **kwargs)
+
     return decorated_function
 
 
 @app.route('/')
 def get_all_posts():
     posts = BlogPost.query.all()
-    return render_template("index.html", all_posts=posts, current_user=current_user)
+    return render_template("index.html",
+                           all_posts=posts,
+                           current_user=current_user)
 
 
 @app.route('/register', methods=["GET", "POST"])
@@ -91,10 +104,7 @@ def register():
             return redirect(url_for('login'))
 
         hash_and_salted_password = generate_password_hash(
-            form.password.data,
-            method='pbkdf2:sha256',
-            salt_length=8
-        )
+            form.password.data, method='pbkdf2:sha256', salt_length=8)
         new_user = User(
             email=form.email.data,
             name=form.name.data,
@@ -105,7 +115,9 @@ def register():
         login_user(new_user)
         return redirect(url_for("get_all_posts"))
 
-    return render_template("register.html", form=form, current_user=current_user)
+    return render_template("register.html",
+                           form=form,
+                           current_user=current_user)
 
 
 @app.route('/login', methods=["GET", "POST"])
@@ -145,15 +157,16 @@ def show_post(post_id):
             flash("You need to login or register to comment.")
             return redirect(url_for("login"))
 
-        new_comment = Comment(
-            text=form.comment_text.data,
-            comment_author=current_user,
-            parent_post=requested_post
-        )
+        new_comment = Comment(text=form.comment_text.data,
+                              comment_author=current_user,
+                              parent_post=requested_post)
         db.session.add(new_comment)
         db.session.commit()
 
-    return render_template("post.html", post=requested_post, form=form, current_user=current_user)
+    return render_template("post.html",
+                           post=requested_post,
+                           form=form,
+                           current_user=current_user)
 
 
 @app.route("/about")
@@ -171,34 +184,30 @@ def contact():
 def add_new_post():
     form = CreatePostForm()
     if form.validate_on_submit():
-        new_post = BlogPost(
-            title=form.title.data,
-            subtitle=form.subtitle.data,
-            body=form.body.data,
-            img_url=form.img_url.data,
-            author=current_user,
-            date=date.today().strftime("%B %d, %Y")
-        )
+        new_post = BlogPost(title=form.title.data,
+                            subtitle=form.subtitle.data,
+                            body=form.body.data,
+                            img_url=form.img_url.data,
+                            author=current_user,
+                            date=date.today().strftime("%B %d, %Y"))
         db.session.add(new_post)
         db.session.commit()
         return redirect(url_for("get_all_posts"))
 
-    return render_template("make-post.html", form=form, current_user=current_user)
-
-
+    return render_template("make-post.html",
+                           form=form,
+                           current_user=current_user)
 
 
 @app.route("/edit-post/<int:post_id>", methods=["GET", "POST"])
 @admin_only
 def edit_post(post_id):
     post = BlogPost.query.get(post_id)
-    edit_form = CreatePostForm(
-        title=post.title,
-        subtitle=post.subtitle,
-        img_url=post.img_url,
-        author=current_user,
-        body=post.body
-    )
+    edit_form = CreatePostForm(title=post.title,
+                               subtitle=post.subtitle,
+                               img_url=post.img_url,
+                               author=current_user,
+                               body=post.body)
     if edit_form.validate_on_submit():
         post.title = edit_form.title.data
         post.subtitle = edit_form.subtitle.data
@@ -207,7 +216,10 @@ def edit_post(post_id):
         db.session.commit()
         return redirect(url_for("show_post", post_id=post.id))
 
-    return render_template("make-post.html", form=edit_form, is_edit=True, current_user=current_user)
+    return render_template("make-post.html",
+                           form=edit_form,
+                           is_edit=True,
+                           current_user=current_user)
 
 
 @app.route("/delete/<int:post_id>")
